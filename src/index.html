@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+    <title>Macros</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap table CSS -->
+    <link href="dist/bootstrap-table.css" rel="stylesheet">
+
+    <script src="js/jquery-3.2.1.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="dist/bootstrap-table.js"></script>
+
+    <script src="dist/extensions/export/bootstrap-table-export.js"></script>
+    <script src="dist/extensions/editable/bootstrap-table-editable.js"></script>
+    <script src="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js"></script>
+    <script src="http://rawgit.com/vitalets/x-editable/master/dist/bootstrap3-editable/js/bootstrap-editable.js"></script>
+
+    <script src="//api.backendless.com/sdk/js/v4/beta/backendless.min.js"></script>
+    <script src="app_js/app.js"></script>
+</head>
+<body>
+<script>
+
+    //    var grid = $('#table'); // no sirve
+    //    var event = $('#eventsResult'); // tampoco sirve
+
+    $(function () {
+        console.log("*********  333  **********");
+
+        //checar columns para editable
+        $('#table').bootstrapTable({
+            idField: 'Food',
+            columns: [{
+                field: 'food',
+                title: 'comidas'
+            }, {
+                field: 'grams',
+                title: 'Gramos',
+                editable: {
+                    type: 'text'
+                }
+            }, {
+                field: 'fats',
+                title: 'Fats',
+                editable: {
+                    type: 'text'
+                }
+            }, {
+                field: 'carbs',
+                title: 'Carbs',
+                editable: {
+                    type: 'number'
+                }
+            }, {
+                field: 'fiber',
+                title: 'Fiber',
+                editable: {
+                    type: 'text'
+                }
+            }, {
+                field: 'brand',
+                title: 'Brand',
+                editable: {
+                    type: 'textarea'
+                }
+            }]
+        });
+
+    });
+
+    function indexFormatter(value, row, index) {
+        return index;
+    }
+
+    $(document).ready(function () {
+        console.log("*********  2222  **********");
+        loadMacros();
+    });
+
+    function loadMacros() {
+        var macros;
+        Backendless.Data.of(MACROS_TABLE).find()
+            .then(function (result) {
+                console.log("result.length - " + result.length);
+                for (i = 0; i < result.length; i++) {
+                    console.log("property name - " + result[i].food);
+                }
+                macros = result;
+                <!--macros = JSON.stringify(result);-->
+                print(macros);
+                $('#table').bootstrapTable("load", macros);
+            })
+            .catch(function (error) {
+                console.log("got error loading - " + error);
+            });
+//         $('#table').bootstrapTable({})
+    }
+
+
+    // save product
+    function save() {
+        Backendless.Data.of(MACROS_TABLE).save({
+            food: "Aguacate",
+            grams: "100",
+            proteins: "1.f6",
+            fats: "15.41",
+            carbs: "8.64",
+            fiber: "6.8",
+            brand: ""
+        })
+            .then(function (obj) {
+                console.log("object saved. objectId " + obj.objectId)
+                console.log("name: " + obj.food)
+                loadMacros();
+            })
+            .catch(function (error) {
+                console.log("got error saving - " + error)
+            })
+    }
+
+    // remove product
+    function remove() {
+        var selections = $('#table').bootstrapTable('getSelections');
+        console.log("selections.length: " + selections.length);
+
+        if (selections.length > 0) {
+            for (i = 0; i < selections.length; i++) { // if we use checkbox we will need use the for loop
+                Backendless.Data.of(MACROS_TABLE).remove({
+                    objectId: selections[i].objectId
+                })
+                    .then(function (timestamp) {
+                        console.log("object removed: " + timestamp)
+                        loadMacros();
+                    })
+                    .catch(function (error) {
+                        console.log("got error removing - " + error)
+                    })
+            }
+        }
+    }
+
+    function print(macros) {
+        console.log(macros);
+    }
+
+    function refresh() {
+        console.log("Hello! I am an alert box3!!");
+        $('#table').bootstrapTable("refresh", loadMacros());
+    }
+
+    function addRow() {
+        console.log("Adding Row!!");
+        var randomId = 100 + ~~(Math.random() * 100);
+        $('#table').bootstrapTable("insertRow", {
+            index: 0,
+            row: {
+                id: randomId
+            }
+        });
+    }
+
+    // custom actions table.
+    $(function () {
+
+        console.log("*********  1111  **********");
+
+        // onDblClickCell
+        $('#table').on('dbl-click-row.bs.table', function (e, row, $element) {
+            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("Click en Fila!!");
+            console.log("food: " + row.food);
+        });
+
+        // onCheck
+        $('#table').on('check.bs.table', function (e, row, $element) {
+            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("Click en Fila!!");
+            console.log("objectID: " + row.objectId);
+        });
+
+        // onUncheck
+        $('#table').on('uncheck.bs.table', function (e, row, $element) {
+            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("Click en Fila!!");
+            console.log("food: " + row.food);
+        });
+
+        // onRefresh
+        $('#table').on('refresh.bs.table', function (e, data) {
+            console.log("Refresh Table!!");
+            loadMacros();
+        });
+
+    });
+
+</script>
+
+<div class="alert alert-success" id="eventsResult">
+    Here is the result of event.
+</div>
+
+<div id="toolbar" class="btn-group">
+    <button type="button" class="btn btn-default" onclick="addRow()">
+        <i class="glyphicon glyphicon-plus"></i>
+    </button>
+    <!--<button type="button" class="btn btn-default" onclick="refresh()">-->
+        <!--<i class="glyphicon glyphicon-heart"></i>-->
+    <!--</button>-->
+    <button type="button" class="btn btn-default" onclick="remove()">
+        <i class="glyphicon glyphicon-trash"></i>
+    </button>
+</div>
+<table id="table"
+       data-toolbar="#toolbar"
+       data-toggle="table"
+       data-search="true"
+       data-show-refresh="true"
+       data-show-toggle="true"
+       data-show-columns="true"
+       data-show-export="true"
+       data-id-field="id">
+    <thead>
+    <tr>
+        <th data-radio="true"></th>
+        <th data-formatter="indexFormatter">Id</th>
+        <th data-field="food" data-sortable="true" data-editable="true">Food</th>
+        <th data-field="grams" data-sortable="true" data-editable="true" data-editable-display-formatter="gramsFormatter">Grams</th>
+        <th data-field="proteins" data-sortable="true" data-editable="true">Proteins</th>
+        <th data-field="fats" data-sortable="true" data-editable="true">Fats</th>
+        <th data-field="carbs" data-sortable="true" data-editable="true">Carbs</th>
+        <th data-field="fiber" data-sortable="true" data-editable="true">Fiber</th>
+        <th data-field="brand" data-sortable="true" data-editable="true">Brand</th>
+    </tr>
+    </thead>
+</table>
+
+<div>
+    <button type="button" class="btn btn-primary" onclick="save()">Save</button>
+</div>
+
+<!--<div>-->
+    <!--<button type="button" class="btn btn-primary" onclick="remove()">Delete</button>-->
+<!--</div>-->
+
+
+</body>
+</html>
+                
