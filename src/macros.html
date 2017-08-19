@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+    <title>Macros</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap table CSS -->
+    <link href="dist/bootstrap-table.css" rel="stylesheet">
+    <link href="css/macros.css" rel="stylesheet">
+
+    <script src="js/jquery-3.2.1.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="dist/bootstrap-table.js"></script>
+
+    <script src="dist/extensions/export/bootstrap-table-export.js"></script>
+    <script src="dist/extensions/editable/bootstrap-table-editable.js"></script>
+    <script src="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js"></script>
+    <script src="http://rawgit.com/vitalets/x-editable/master/dist/bootstrap3-editable/js/bootstrap-editable.js"></script>
+
+    <script src="//api.backendless.com/sdk/js/v4/beta/backendless.min.js"></script>
+    <script src="app_js/app.js"></script>
+    <script src="js/utilities.js"></script>
+</head>
+<body>
+<script>
+
+    var mCurrentUser;
+    var mQueryBuilder;
+    var mQuerySize = 100;
+    var mQueryOffset = 0;
+    var mQuerySorted = ["food"];
+    var mTotalMacros = [];
+
+    $(function () {
+        console.log("*********  333  **********");
+        // if true, it means there is a persistent login
+        if (Backendless.UserService.isValidLogin()) {
+            mCurrentUser = Backendless.UserService.loggedInUser();
+            console.log("saved userId - " + mCurrentUser);
+            if (mCurrentUser == null) {
+                // redirect to login.
+                window.location.href = "index.html";
+            }
+//            currentUser = Backendless.Data.of(Backendless.User).findById(userId);
+        } else {
+            console.log("** logging in - there is no previous saved login");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br>there is no previous saved login ");
+
+            // redirect to login.
+            window.location.href = "index.html";
+        }
+    });
+
+    $(document).ready(function () {
+        console.log("*********  2222  **********");
+        loadConsumption();
+
+        // reset values
+        resetGlobalValues();
+        loadMacrosInit(mQueryBuilder);
+    });
+
+    //    function queryParams() {
+    //        console.log("$$$$ queryParams $$$");
+    //        return {
+    //            type: 'owner',
+    //            sort: 'food',
+    //            direction: 'desc',
+    //            per_page: 300,
+    //            page: 1
+    //        };
+    //    }
+
+    function logout() {
+        Backendless.UserService.logout()
+            .then(function () {
+                console.log("<< Logged out");
+                window.location.href = "index.html";
+            })
+            .catch(function (error) {
+                console.log("<< Error trying to logout");
+            });
+    }
+
+
+    /// ======= Inicio MACROS =======
+
+    function loadMacrosInit(queryBuilder) {
+        Backendless.Data.of(MACROS_TABLE).find(queryBuilder)
+            .then(handleResult)
+            .catch(handleError);
+    }
+
+    function handleError(error) {
+        console.log("Server reported an error - ");
+        console.log(error.message);
+        console.log(error.errorCode);
+
+        $('#eventDanger').show();
+        $('#eventDanger').append("<br>Got an error loading - " + error);
+    }
+
+    function handleResult(macrosResponse) {
+        console.log("<< macrosResponse.length: " + macrosResponse.length);
+        printMacrosCollection(macrosResponse);
+
+        // Add the contents of one array to another
+        mTotalMacros.push.apply(mTotalMacros, macrosResponse);
+
+        if (macrosResponse.length > 0) {
+            console.log("<< Next collection");
+            mQueryBuilder.prepareNextPage();
+
+            console.log("<< cleaning before adding new array.");
+            $('#macrosTable').bootstrapTable("removeAll");
+
+            loadMacrosInit(mQueryBuilder);
+        } else {
+            console.log("<< Reached the end of collection");
+            console.log("<< before Load");
+            $('#macrosTable').bootstrapTable("load", mTotalMacros);
+        }
+    }
+
+    function printMacrosCollection(macrosCollection) {
+        console.log("Loaded " + macrosCollection.length +
+            " restaurants in the current page");
+
+        for (var i in macrosCollection)
+            console.log("\t" + macrosCollection[i].food);
+    }
+
+    /// ======= FIN MACROS =======
+
+
+    /// ======= INICIO CONSUMO DIARIO =======
+
+    // Load Consumption
+    function loadConsumption() {
+        var consumption;
+        var whereClause = "userId = '" + mCurrentUser + "' AND created after '" + getTodaysDayFormat(0) + "  00:00:00' AND created before '" +
+            getTodaysDayFormat(1) + "  23:59:59'";
+
+        console.log("where: " + whereClause);
+
+        var queryBuilderConsumption = Backendless.DataQueryBuilder.create().setWhereClause(whereClause);
+
+        Backendless.Data.of(CONSUMPTION_TABLE).find(queryBuilderConsumption)
+            .then(function (result) {
+                console.log("result.length - " + result.length);
+                for (i = 0; i < result.length; i++) {
+                    console.log("consumption property name - " + result[i].food);
+                }
+                consumption = result;
+                print(consumption);
+                $('#consumptionTable').bootstrapTable("load", consumption);
+
+                // call the function to do the sum.
+                totalMacrosTable();
+            })
+            .catch(function (error) {
+                console.log("got error loading consumption - " + error);
+                $('#eventDanger').show();
+                $('#eventDanger').append("<br>Got an error loading - " + error);
+            });
+    }
+
+    // Operations on totals
+    function totalMacrosTable() {
+//        alert(document.getElementById("totalDayValues").rows[0].cells.item(0).innerHTML);
+//        alert(document.getElementById("totalDayValues").rows[2].cells.item(2).innerHTML);
+        var consumptionTable = document.getElementById("consumptionTable");
+        var valuesTable = document.getElementById("totalDayValues");
+
+        var proteinsField = valuesTable.rows[1].cells.item(2);
+        var fatsField = valuesTable.rows[2].cells.item(2);
+        var carbsField = valuesTable.rows[3].cells.item(2);
+        var fiberField = valuesTable.rows[4].cells.item(2);
+
+        console.log("consumptionTable.rows.length: " + consumptionTable.rows.length);
+        var totalProts = 0;
+        var totalFats = 0;
+        var totalCarbs = 0;
+        var totalFiber = 0;
+        for (i = 1; i < consumptionTable.rows.length; i++) {
+            console.log("consumptionTable.rows[i].cells.length: " + consumptionTable.rows[i].cells.length);
+            for (j = 0; j < consumptionTable.rows[i].cells.length; j++) {
+                switch (j) {
+                    case MACRO_CELL.PROTEIN:
+                        console.log("soy Prots: " + consumptionTable.rows[i].cells.item(j).innerHTML);
+                        totalProts += Number(consumptionTable.rows[i].cells.item(j).innerHTML);
+                        console.log("***** PROTS Total " + totalProts);
+                        break;
+                    case MACRO_CELL.FAT:
+                        console.log("soy Fats: " + consumptionTable.rows[i].cells.item(j).innerHTML);
+                        totalFats += Number(consumptionTable.rows[i].cells.item(j).innerHTML);
+                        console.log("***** FATS Total " + totalFats);
+                        break;
+                    case MACRO_CELL.CARB:
+                        console.log("soy Carbs: " + consumptionTable.rows[i].cells.item(j).innerHTML);
+                        totalCarbs += Number(consumptionTable.rows[i].cells.item(j).innerHTML);
+                        console.log("***** CARBS Total " + totalCarbs);
+                        break;
+                    case MACRO_CELL.FIBER:
+                        console.log("soy Fiber: " + consumptionTable.rows[i].cells.item(j).innerHTML);
+                        totalFiber += Number(consumptionTable.rows[i].cells.item(j).innerHTML);
+                        console.log("***** FIBER Total " + totalFiber);
+                        break;
+                }
+            }
+        }
+
+        // printing totals in table
+        proteinsField.innerHTML = totalProts;
+        fatsField.innerHTML = totalFats;
+        carbsField.innerHTML = totalCarbs;
+        fiberField.innerHTML = totalFiber;
+    }
+
+    // remove product
+    function removeMacros() {
+        var selections = $('#macrosTable').bootstrapTable('getSelections');
+        console.log("selections.length: " + selections.length);
+
+        if (selections.length > 0) {
+            for (i = 0; i < selections.length; i++) { // if we use checkbox we will need use the for loop
+                Backendless.Data.of(MACROS_TABLE).remove({
+                    objectId: selections[i].objectId
+                })
+                    .then(function (timestamp) {
+                        console.log("object removed: " + timestamp);
+
+                        // reset values
+                        resetGlobalValues();
+                        loadMacrosInit(mQueryBuilder);
+                    })
+                    .catch(function (error) {
+                        console.log("got error removing - " + error);
+                        $('#eventDanger').show();
+                        $('#eventDanger').append("<br>Got an error removing - " + error);
+                    })
+            }
+        } else {
+            console.log("Select an Item, please");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br><b>Select an Item, please</b>");
+        }
+    }
+
+
+    // add food to new table
+    function addFood() {
+
+        var selectedRow = $('#macrosTable').bootstrapTable('getSelections');
+        console.log("selections.length: " + selectedRow.length);
+
+        if (selectedRow.length > 0) {
+            console.log("*** selection to insert: " + selectedRow[0].food);
+            console.log("Proteins: " + selectedRow[0].proteins);
+            console.log("MacroID: " + selectedRow[0].objectId);
+
+            var consumptionRow = {
+                dietFood: selectedRow[0].food,
+                dietGrams: selectedRow[0].grams,
+                dietProteins: selectedRow[0].proteins,
+                dietFats: selectedRow[0].fats,
+                dietCarbs: selectedRow[0].carbs,
+                dietFiber: selectedRow[0].fiber,
+                macroId: selectedRow[0].objectId,
+                userId: mCurrentUser
+            };
+
+            $('#consumptionTable').bootstrapTable('insertRow', {
+                index: 1, row: (consumptionRow)
+            });
+
+            // Saving on Consumption Table
+            Backendless.Data.of(CONSUMPTION_TABLE).save(consumptionRow)
+                .then(function (obj) {
+                    console.log("object saved in consumption objectId " + obj.objectId);
+                    console.log("name: " + obj.dietFood);
+                    loadConsumption();
+                }).catch(function (error) {
+                console.log("got error saving - consumption" + error);
+                $('#eventDanger').show();
+                $('#eventDanger').append("<br>Got an error saving - " + error);
+            });
+        } else {
+            console.log("Select an Item, please");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br><b>Select an Item, please</b>");
+        }
+    }
+
+    function print(macros) {
+        console.log(macros);
+    }
+
+    //    function refreshMacros() {
+    //        console.log("Hello! I am an alert box3!!");
+    //        $('#macrosTable').bootstrapTable("refresh", loadMacros());
+    //        $('#eventSuccess').show();
+    //        $('#eventSuccess').append("<br>Data refreshed!");
+    //    }
+
+    function addRowMacros() {
+        console.log("Adding Row!!");
+//        var randomId = 100 + ~~(Math.random() * 100);
+//        console.log("randomId: %s", randomId);
+
+        var newFood = {
+            food: "",
+            grams: "0",
+            proteins: "0",
+            fats: "0",
+            carbs: "0",
+            fiber: "0",
+            brand: ""
+        };
+
+
+        // insert in table
+        $('#macrosTable').bootstrapTable("insertRow", {
+            index: 0,
+            row: (newFood)
+        });
+
+        // persist on Backend Less
+        Backendless.Data.of(MACROS_TABLE).save(newFood)
+            .then(function (obj) {
+                console.log("object saved. objectId " + obj.objectId);
+                console.log("name: " + obj.food);
+                console.log("prot111: " + obj.proteins);
+
+                // reset values
+                resetGlobalValues();
+                loadMacrosInit(mQueryBuilder);
+
+//                $('#eventSuccess').show();
+//                $('#eventSuccess').append("<br>Saved!");
+            }).catch(function (error) {
+            console.log("got error saving - " + error);
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br>Got an error saving - " + error);
+        })
+    }
+
+    function removeConsumption() {
+        var selections = $('#consumptionTable').bootstrapTable('getSelections');
+        console.log("consumption selections.length: " + selections.length);
+
+        if (selections.length > 0) {
+            for (i = 0; i < selections.length; i++) { // if we use checkbox we will need use the for loop
+                Backendless.Data.of(CONSUMPTION_TABLE).remove({
+                    objectId: selections[i].objectId
+                })
+                    .then(function (timestamp) {
+                        console.log("consumption object removed: " + timestamp);
+                        loadConsumption();
+                    })
+                    .catch(function (error) {
+                        console.log("got error removing - " + error);
+                        $('#eventDanger').show();
+                        $('#eventDanger').append("<br>Got an error removing - " + error);
+                    })
+            }
+        } else {
+            console.log("Select an Item, please");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br><b>Select an Item, please</b>");
+        }
+    }
+
+
+
+    /// ======= inicio CUSTOM EVENTS =======
+
+
+    // custom actions table.
+    $(function () {
+
+        console.log("*********  1111  **********");
+
+        // hiding column for Grams
+        $("#collapseGrams").addClass("out");
+        $("#collapseGrams").removeClass("in");
+
+        // onDblClickCell
+        $('#macrosTable').on('dbl-click-row.bs.table', function (e, row, $element) {
+//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("doble click row!!");
+            console.log("food: " + row.food);
+        });
+
+        // onCheck
+        $('#macrosTable').on('check.bs.table', function (e, row, $element) {
+//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("Click en Fila!!");
+            console.log("objectID: " + row.objectId);
+            console.log("prot1: " + row.proteins);
+        });
+
+        $('#macrosTable').on('page-change.bs.table', function (e, number, size, search) {
+            console.log(":::page-change.bs.table  >>>>");
+            console.log("number:" + number); //page 2
+            console.log("size:" + size); // size 10
+            // custom offset
+//            var offset = (number - 1) * size;
+//            loadMacros(offset, size);
+        });
+
+        // onUncheck
+        $('#macrosTable').on('uncheck.bs.table', function (e, row, $element) {
+//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("UnCheck Fila!!");
+            console.log("food: " + row.food);
+        });
+
+        // onRefresh Macros
+        $('#macrosTable').on('refresh.bs.table', function (e, data) {
+            console.log("<< Refresh Table!!");
+
+            // reset values
+            resetGlobalValues();
+            loadMacrosInit(mQueryBuilder);
+        });
+
+        // update macros values.
+        $('#macrosTable').on('editable-save.bs.table', function (e, field, row, old, $el) {
+            console.log(":::: MACROS TABLE ENTER :::");
+            console.log("field: " + field);
+
+            var saveFood = {
+                objectId: row.objectId,
+                food: row.food.toString(),
+                grams: row.grams.toString(),
+                proteins: row.proteins.toString(),
+                fats: row.fats.toString(),
+                carbs: row.carbs.toString(),
+                fiber: row.fiber.toString()
+            };
+
+            console.log("**** saveFood.ObjectID: " + saveFood.objectId);
+
+            // update row and table.
+            Backendless.Data.of(MACROS_TABLE).save(saveFood)
+                .then(function (obj) {
+                    console.log("object update in saveFood objectId " + obj.objectId);
+                    console.log("name saveFood: " + obj.food);
+
+                    // reset values
+                    resetGlobalValues();
+                    loadMacrosInit(mQueryBuilder);
+
+//                        $('#eventSuccess').show();
+//                        $('#eventSuccess').append("<br>Saved!");
+                }).catch(function (error) {
+                console.log("got error update - consumption" + error);
+                $('#eventDanger').show();
+                $('#eventDanger').append("<br>Got an error saving - " + error);
+            })
+        });
+
+        // data hide alert
+        $('#closeDanger').on("click", function () {
+            console.log("hiding bar danger");
+            $('#eventDanger').hide();
+        });
+
+        $('#closeSuccess').on("click", function () {
+            console.log("hiding bar success");
+            $('#eventSuccess').hide();
+        });
+
+
+        // totalDayValues
+        // update fields
+        $('#totalDayValues').on('editable-save.bs.table', function (e, field, row, old, $el) {
+            console.log(":: totalDayValues Table ::");
+
+            console.log("row.totalDay : " + row.totalDay);
+            console.log("row.totalConsumed : " + row.totalConsumed);
+            console.log("row.totalPending : " + row.totalPending);
+
+
+        });
+
+        // Consumption table
+        // update data
+
+        $('#consumptionTable').on('editable-save.bs.table', function (e, field, row, old, $el) {
+            console.log("::: CONSUMPTION TABLE DATA :::");
+            console.log("field: " + field);
+            if (field == "dietGrams") {
+                console.log("< row.macroId :" + row.macroId);
+
+                Backendless.Data.of(MACROS_TABLE).findById(row.macroId)
+                    .then(function (result) {
+
+                        row.dietProteins = result.proteins * row.dietGrams / result.grams;
+
+                        row.dietFats = result.fats * row.dietGrams / result.grams;
+                        row.dietCarbs = result.carbs * row.dietGrams / result.grams;
+                        row.dietFiber = result.fiber * row.dietGrams / result.grams;
+
+                        console.log("new Proteins: " + row.dietProteins);
+                        console.log("new Fats: " + row.dietFats);
+                        console.log("new Carbs: " + row.dietCarbs);
+                        console.log("new Fiber: " + row.dietFiber);
+
+                        console.log("&&&&& ObjectID: " + row.objectId);
+
+                        var consumption = {
+                            objectId: row.objectId,
+                            dietGrams: row.dietGrams.toString(),
+                            dietProteins: row.dietProteins.toString(),
+                            dietFats: row.dietFats.toString(),
+                            dietCarbs: row.dietCarbs.toString(),
+                            dietFiber: row.dietFiber.toString()
+                        };
+
+                        console.log("**** consumption.ObjectID: " + consumption.objectId);
+
+                        // update row and table.
+                        Backendless.Data.of(CONSUMPTION_TABLE).save(consumption)
+                            .then(function (obj) {
+                                console.log("object update in consumption objectId " + obj.objectId);
+                                console.log("name: " + obj.food);
+                                loadConsumption();
+//                        $('#eventSuccess').show();
+//                        $('#eventSuccess').append("<br>Saved!");
+                            }).catch(function (error) {
+                            console.log("got error update - consumption" + error);
+                            $('#eventDanger').show();
+                            $('#eventDanger').append("<br>Got an error saving - " + error);
+                        })
+                    })
+                    .catch(function (error) {
+                        console.log("ID not found." + error);
+                    });
+            } else {
+                console.log("::: we dont care :::");
+            }
+        });
+    });
+
+    /// ======= fin CUSTOM EVENTS =======
+
+
+
+    // save product
+    //    function save() {
+    //
+    //        var selections = $('#macrosTable').bootstrapTable('getSelections');
+    //        console.log("selections.length: " + selections.length);
+    //
+    //        if (selections.length > 0) {
+    //            console.log("<< selection to save: " + selections[0].food);
+    //            if (selections[0].food.trim() == "" || selections[0].grams.trim() == ""
+    //                || selections[0].proteins.trim() == "" || selections[0].fats.trim() == "" || selections[0].carbs.trim() == "") {
+    //                $('#eventDanger').show();
+    //                $('#eventDanger').append("<br><b>Enter a value please</b>");
+    //                return
+    //            }
+    //            Backendless.Data.of(MACROS_TABLE).save({
+    //                food: selections[0].food,
+    //                grams: selections[0].grams,
+    //                proteins: selections[0].proteins,
+    //                fats: selections[0].fats,
+    //                carbs: selections[0].carbs,
+    //                fiber: selections[0].fiber,
+    //                brand: selections[0].brand
+    //            }).then(function (obj) {
+    //                console.log("<< object saved. objectId " + obj.objectId);
+    //                console.log("name: " + obj.food);
+    //                console.log("*prot111: " + obj.proteins);
+    //                loadMacros();
+    //                $('#eventSuccess').show();
+    //                $('#eventSuccess').append("<br>Saved!");
+    //            }).catch(function (error) {
+    //                console.log("got error saving - " + error);
+    //                $('#eventDanger').show();
+    //                $('#eventDanger').append("<br>Got an error saving - " + error);
+    //            })
+    //        } else {
+    //            console.log("Select an Item, please");
+    //            $('#eventDanger').show();
+    //            $('#eventDanger').append("<br><b>Select an Item, please</b>");
+    ////            $('#eventsDanger').text('Select an Item, please');
+    //        }
+    //    }
+
+</script>
+
+<!--<div class="alert alert-success" id="eventsResult">-->
+<!--Here is the result of event.-->
+<!--</div>-->
+
+<br>
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target=".macros">Open Macros</button>
+<button type="button" class="btn btn-danger" style="float: right;" onclick="logout()">Log out</button>
+<br>
+<br>
+<div id="toolbarConsumption" class="btn-group">
+    <br>
+    <button type="button" class="btn btn-default" onclick="removeConsumption()">
+        <i class="glyphicon glyphicon-trash"></i>
+    </button>
+</div>
+
+<table id="consumptionTable"
+       data-toolbar="#toolbar"
+       data-toggle="table"
+       data-show-toggle="false"
+       data-show-columns="false"
+       data-show-export="true"
+       data-id-field="id"
+       data-editable-emptytext="This field is empty" class="table table-bordered">
+    <thead>
+    <tr>
+        <th data-radio="true"></th>
+        <th data-field="dietFood" data-sortable="true" data-editable="false">Food</th>
+        <th data-field="dietGrams" data-sortable="true" data-editable="true">Grams</th>
+        <th data-field="dietProteins" data-sortable="true" data-editable="false">Proteins</th>
+        <th data-field="dietFats" data-sortable="true" data-editable="false">Fats</th>
+        <th data-field="dietCarbs" data-sortable="true" data-editable="false">Carbs</th>
+        <th data-field="dietFiber" data-sortable="true" data-editable="false">Fiber</th>
+        <!--<th data-field="dietGramsOld" id="collapseGrams" class="collapse out" data-sortable="false" data-editable="false">Old Grams</th>-->
+    </tr>
+    </thead>
+</table>
+
+<br>
+<br>
+<table id="totalDayValues"
+       data-toolbar="#toolbar"
+       data-toggle="table"
+       data-show-toggle="false"
+       data-show-columns="false"
+       data-show-export="false"
+       data-id-field="id"
+       data-editable-emptytext="This field is empty" class="table table-sm"> <!-- table-striped-->
+    <thead>
+    <tr>
+        <th data-field="totalMacros" data-sortable="true" data-editable="false">Macros</th>
+        <th data-field="totalDay" data-sortable="true" data-editable="true">Diario</th>
+        <th data-field="totalConsumed" data-sortable="true" data-editable="false">Consumido</th>
+        <th data-field="totalPending" data-sortable="true" data-editable="false">Por Comer</th>
+    </tr>
+    <tbody>
+    <tr>
+        <th scope="row">1</th>
+        <td>Proteins gr</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <th scope="row">2</th>
+        <td>Fats gr</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <th scope="row">3</th>
+        <td>Carbs gr</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <th scope="row">4</th>
+        <td>Fiber</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+    </tr>
+    </tbody>
+    </thead>
+</table>
+
+
+<div class="modal fade macros" tabindex="-1" role="dialog" aria-labelledby="gridSystemModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="gridSystemModalLabel">Macros Table</h4>
+            </div>
+            <div class="modal-body">
+
+                <div class="alert alert-success alert-dismissible" role="alert" id="eventSuccess" hidden="hidden">
+                    <a href="#" class="close" aria-label="closeSuccess" id="close">×</a>
+                </div>
+                <!--<div class="alert alert-info alert-dismissible fade show" role="alert" id="eventInfo" hidden="hidden">-->
+                <!--<a href="#" class="close" data-dismiss="alert" aria-label="close">×</a>-->
+                <!--</div>-->
+                <!--<div class="alert alert-warning alert-dismissible fade show" role="alert" id="eventWarning" hidden="hidden">-->
+                <!--<a href="#" class="close" data-dismiss="alert" aria-label="close">×</a>-->
+                <!--</div>-->
+                <div class="alert alert-danger alert-dismissible" role="alert" id="eventDanger" hidden="hidden">
+                    <a href="#" class="close" aria-label="close" id="closeDanger">&times;</a>
+                </div>
+
+                <div id="toolbar" class="btn-group">
+                    <button type="button" class="btn btn-default" onclick="addRowMacros()">
+                        <i class="glyphicon glyphicon-plus"></i>
+                    </button>
+                    <!--<button type="button" class="btn btn-default" onclick="refresh()">-->
+                    <!--<i class="glyphicon glyphicon-heart"></i>-->
+                    <!--</button>-->
+                    <button type="button" class="btn btn-default" onclick="removeMacros()">
+                        <i class="glyphicon glyphicon-trash"></i>
+                    </button>
+                </div>
+                <!--<div class="panel panel-default">-->
+                <!-- Default panel contents -->
+                <!--<div class="panel-heading">Macros</div>-->
+                <table id="macrosTable"
+                       data-toolbar="#toolbar"
+                       data-toggle="table"
+                       data-search="true"
+                       data-show-refresh="true"
+                       data-show-toggle="true"
+                       data-show-columns="true"
+                       data-show-export="true"
+                       data-id-field="id"
+                       data-pagination="true"
+                       data-page-list="[10, 50, 100, All]"
+                       data-page-size="10"
+                       data-editable-emptytext="This field is empty"> <!-- data-query-params="queryParams" -->
+                    <thead>
+                    <tr>
+                        <th data-radio="true"></th>
+                        <!--<th data-formatter="indexFormatter">Id</th>-->
+                        <th data-field="food" data-sortable="true" data-editable="true">Food</th>
+                        <th data-field="grams" data-sortable="true" data-editable="true">Grams</th>
+                        <th data-field="proteins" data-sortable="true" data-editable="true">Proteins</th>
+                        <th data-field="fats" data-sortable="true" data-editable="true">Fats</th>
+                        <th data-field="carbs" data-sortable="true" data-editable="true">Carbs</th>
+                        <th data-field="fiber" data-sortable="true" data-editable="true">Fiber</th>
+                        <th data-field="brand" data-sortable="true" data-editable="true">Brand</th>
+                    </tr>
+                    </thead>
+                </table>
+                <!--</div>-->
+
+                <!--<div>-->
+                <!--<button type="button" class="btn btn-primary" onclick="save()">Save food</button>-->
+                <!--</div>-->
+
+                <!--<div>-->
+                <!--<button type="button" class="btn btn-primary" onclick="remove()">Delete</button>-->
+                <!--</div>-->
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" onclick="addFood()">Add food</button>
+            </div>
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+
+</body>
+</html>
+                
