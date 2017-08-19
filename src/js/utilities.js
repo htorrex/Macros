@@ -50,13 +50,3 @@ function resetGlobalValues() {
     mQueryBuilder = customBuilder;
 }
 
-
-// function queryParams() {
-//     return {
-//         // type: 'owner',
-//         sort: 'food',
-//         direction: 'desc',
-//         per_page: 100,
-//         page: 1
-//     };
-// }

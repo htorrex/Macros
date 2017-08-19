@@ -36,6 +36,7 @@
     var mQuerySize = 100;
     var mQueryOffset = 0;
     var mQuerySorted = ["food"];
+    var mQuerySortedConsumption = ["dietFood"];
     var mTotalMacros = [];
 
     $(function () {
@@ -67,17 +68,6 @@
         resetGlobalValues();
         loadMacrosInit(mQueryBuilder);
     });
-
-    //    function queryParams() {
-    //        console.log("$$$$ queryParams $$$");
-    //        return {
-    //            type: 'owner',
-    //            sort: 'food',
-    //            direction: 'desc',
-    //            per_page: 300,
-    //            page: 1
-    //        };
-    //    }
 
     function logout() {
         Backendless.UserService.logout()
@@ -151,9 +141,13 @@
 
         console.log("where: " + whereClause);
 
-        var queryBuilderConsumption = Backendless.DataQueryBuilder.create().setWhereClause(whereClause);
+        var consumptionQuery = Backendless.DataQueryBuilder.create();
+        consumptionQuery.setWhereClause(whereClause)
+                        .setPageSize(mQuerySize)
+                        .setOffset(mQueryOffset)
+                        .setSortBy(mQuerySortedConsumption);
 
-        Backendless.Data.of(CONSUMPTION_TABLE).find(queryBuilderConsumption)
+        Backendless.Data.of(CONSUMPTION_TABLE).find(consumptionQuery)
             .then(function (result) {
                 console.log("result.length - " + result.length);
                 for (i = 0; i < result.length; i++) {
@@ -380,7 +374,6 @@
     }
 
 
-
     /// ======= inicio CUSTOM EVENTS =======
 
 
@@ -553,7 +546,6 @@
     });
 
     /// ======= fin CUSTOM EVENTS =======
-
 
 
     // save product
