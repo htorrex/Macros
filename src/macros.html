@@ -386,6 +386,19 @@
         $("#collapseGrams").addClass("out");
         $("#collapseGrams").removeClass("in");
 
+        // addfood button after adding unchecking all the rows.
+        $('#uncheckAll').click(function () {
+            console.log("1111 Uncheking the rows and reset the search");
+            $('#macrosTable').bootstrapTable('resetSearch');
+            $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+        });
+
+        $('#closeModal').click(function () {
+            console.log("2222  Uncheking the rows and reset the search");
+            $('#macrosTable').bootstrapTable('resetSearch');
+            $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+        });
+
         // onDblClickCell
         $('#macrosTable').on('dbl-click-row.bs.table', function (e, row, $element) {
 //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
@@ -551,7 +564,6 @@
 
     /// ======= fin CUSTOM EVENTS =======
 
-
     // save product
     //    function save() {
     //
@@ -619,7 +631,8 @@
        data-show-columns="false"
        data-show-export="true"
        data-id-field="id"
-       data-editable-emptytext="This field is empty" class="table table-bordered">
+       data-click-to-select = "true"
+       data-editable-emptytext="This field is empty" class="table table-bordered table table-striped">
     <thead>
     <tr>
         <!--<th data-radio="true"></th>-->
@@ -637,7 +650,7 @@
 
 <br>
 <br>
-<table id="totalDayValues"
+<table class="table table-striped" id="totalDayValues"
        data-toolbar="#toolbar"
        data-toggle="table"
        data-show-toggle="false"
@@ -649,7 +662,7 @@
     <tr>
         <th data-field="totalMacros" data-sortable="true" data-editable="false">Macros</th>
         <th data-field="totalDay" data-sortable="true" data-editable="true">Diario</th>
-        <th data-field="totalConsumed" data-sortable="true" data-editable="false">Consumido</th>
+        <th data-field="totalConsumed" data-sortable="true" data-editable="false" class="info">Consumido</th>
         <th data-field="totalPending" data-sortable="true" data-editable="false">Por Comer</th>
     </tr>
     <tbody>
@@ -690,7 +703,8 @@
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="close" id="closeModal" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="gridSystemModalLabel">Macros Table</h4>
             </div>
             <div class="modal-body">
@@ -764,7 +778,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" onclick="addFood()">Add food</button>
+                <button type="button" id="uncheckAll" class="btn btn-success" onclick="addFood()" data-dismiss="modal">Add food</button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
