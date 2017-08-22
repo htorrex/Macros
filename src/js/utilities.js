@@ -35,6 +35,37 @@ function getTodaysDayFormat(plusMoreDays) {
     return today;
 }
 
+function calculateHoursTimeZone(baseFormat) {
+    // baseFormat would be :59:59 OR :00:00
+    var timeZoneOffset = getCurrentTimeZoneInHours(); // GMT-5 would be 5.
+    var hourFormat = timeZoneOffset;
+
+    if (baseFormat.includes("59")) {
+        hourFormat -= 1; // we subtract in 1 in order to have the end of the format. 4:59:59
+    }
+
+    hourFormat = hourFormat + baseFormat; // adding the format 04:59:59
+
+    if (timeZoneOffset < 10) { // we add a 0 before the current format.
+        hourFormat = '0' + hourFormat;
+    }
+
+    console.log("hourFormat: %s", hourFormat);
+
+    return hourFormat;
+}
+
+function getCurrentTimeZoneInHours() {
+    // Get current timezone offset for host device
+    var today = new Date();
+    console.log("today.getTimezoneOffset(): %s ", today.getTimezoneOffset());
+    var currentTimeZoneOffsetInHours = today.getTimezoneOffset() / 60;
+
+    console.log("currentTimeZoneOffsetInHours: %s ", currentTimeZoneOffsetInHours);
+
+    return currentTimeZoneOffsetInHours;
+}
+
 function resetGlobalValues() {
     mQuerySize = 100;
     mQueryOffset = 0;

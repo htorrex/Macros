@@ -136,8 +136,9 @@
     // Load Consumption
     function loadConsumption() {
         var consumption;
-        var whereClause = "userId = '" + mCurrentUser + "' AND created after '" + getTodaysDayFormat(0) + "  00:00:00' AND created before '" +
-            getTodaysDayFormat(1) + "  23:59:59'";
+        var whereClause =
+            "userId = '" + mCurrentUser + "' AND created after '" + getTodaysDayFormat(0) + " " + calculateHoursTimeZone(":00:00") +
+            "' AND created before '" + getTodaysDayFormat(1) + " " + calculateHoursTimeZone(":59:59") + "'";
 
         console.log("where: " + whereClause);
 
@@ -632,7 +633,7 @@
        data-show-columns="false"
        data-show-export="true"
        data-id-field="id"
-       data-click-to-select = "true"
+       data-click-to-select="true"
        data-editable-emptytext="This field is empty" class="table table-bordered table table-striped">
     <thead>
     <tr>
@@ -749,7 +750,7 @@
                        data-pagination="true"
                        data-page-list="[10, 50, 100, All]"
                        data-page-size="10"
-                       data-click-to-select = "true"
+                       data-click-to-select="true"
                        data-editable-emptytext="This field is empty"> <!-- data-query-params="queryParams" -->
                     <thead>
                     <tr>
