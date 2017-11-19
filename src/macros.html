@@ -279,8 +279,8 @@
                 // Saving on Consumption Table
                 Backendless.Data.of(CONSUMPTION_TABLE).save(consumptionRow)
                     .then(function (obj) {
-                        console.log("_object saved in consumption objectId " + obj.objectId);
-                        console.log("_name_after_saving: " + obj.dietFood);
+                        console.log("<< _object saved in consumption objectId " + obj.objectId);
+                        console.log("<< _name_after_saving: " + obj.dietFood);
                         loadConsumption();
                     }).catch(function (error) {
                     console.log("got error saving - consumption" + error);
@@ -307,7 +307,7 @@
     //    }
 
     function addRowMacros() {
-        console.log("Adding Row!!");
+        console.log("<< Adding Row!!");
 //        var randomId = 100 + ~~(Math.random() * 100);
 //        console.log("randomId: %s", randomId);
 
@@ -331,14 +331,19 @@
         // persist on Backend Less
         Backendless.Data.of(MACROS_TABLE).save(newFood)
             .then(function (obj) {
-                console.log("object saved. objectId " + obj.objectId);
+                console.log("<< object saved. objectId " + obj.objectId);
                 console.log("name: " + obj.food);
                 console.log("prot111: " + obj.proteins);
 
                 // reset values
-                resetGlobalValues();
-                loadMacrosInit(mQueryBuilder);
-
+//                resetGlobalValues();
+//                loadMacrosInit(mQueryBuilder);
+//                aqui
+                mTotalMacros.push(obj);
+                // instead of loading all the macros after adding a row we can add just the object to the array
+                console.log("<< added ");
+                $('#macrosTable').bootstrapTable("append", obj);
+                //$table.bootstrapTable('scrollTo', 'bottom');
 //                $('#eventSuccess').show();
 //                $('#eventSuccess').append("<br>Saved!");
             }).catch(function (error) {
@@ -449,6 +454,17 @@
             console.log(":::: MACROS TABLE ENTER :::");
             console.log("field: " + field);
 
+            console.log("<< **** removing ID " + row);
+//            $('#macrosTable').bootstrapTable("removeByUniqueId", row);
+
+            var index = mTotalMacros.indexOf(row);
+            console.log("< INDEX: %s",index);
+//            mTotalMacros.deleteRow(row);
+            mTotalMacros.splice(index, 1);
+            $('#macrosTable').bootstrapTable('removeByUniqueId', index);
+//            $('#macrosTable').bootstrapTable("removeByUniqueId", row);
+
+            console.log("_Deleted_?");
             var saveFood = {
                 objectId: row.objectId,
                 food: row.food.toString(),
@@ -460,20 +476,28 @@
                 brand: row.brand.toString()
             };
 
-            console.log("**** saveFood.ObjectID: " + saveFood.objectId);
+            console.log("<< **** saveFood.ObjectID: " + saveFood.objectId);
 
             // update row and table.
             Backendless.Data.of(MACROS_TABLE).save(saveFood)
                 .then(function (obj) {
-                    console.log("object update in saveFood objectId " + obj.objectId);
-                    console.log("name saveFood: " + obj.food);
+                    console.log("<< object update in saveFood objectId " + obj.objectId);
+                    console.log("<< name saveFood: " + obj.food);
 
                     // reset values
-                    resetGlobalValues();
-                    loadMacrosInit(mQueryBuilder);
-
+                    // aqui
+//                    resetGlobalValues();
+//                    loadMacrosInit(mQueryBuilder);
 //                        $('#eventSuccess').show();
 //                        $('#eventSuccess').append("<br>Saved!");
+
+                    mTotalMacros.push(obj);
+                    // instead of loading all the macros after adding a row we can add just the object to the array
+                    console.log("<< added ");
+                    $('#macrosTable').bootstrapTable("append", obj);
+
+
+                    console.log("<< NOT NEED TO RELOAD.");
                 }).catch(function (error) {
                 console.log("got error update - consumption" + error);
                 $('#eventDanger').show();
@@ -615,7 +639,7 @@
 <!--</div>-->
 
 <br>
-<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#macrosModal">Open Macros</button>
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#macrosModal" onclick="loadMacrosInit(mQueryBuilder)">Open Macros</button>
 <button type="button" class="btn btn-danger" style="float: right;" onclick="logout()">Log out</button>
 <br>
 <br>

@@ -24,6 +24,9 @@ function getTodaysDayFormat(plusMoreDays) {
 
     if (dd < 10) {
         dd = '0' + dd
+    } else if(dd == 32){
+        dd = 1;
+        mm +=1;
     }
 
     if (mm < 10) {
@@ -69,7 +72,7 @@ function getCurrentTimeZoneInHours() {
 function resetGlobalValues() {
     mQuerySize = 100;
     mQueryOffset = 0;
-    mTotalMacros = [];
+    // mTotalMacros = [];
 
     console.log("<< mQuerySize:%s, mQueryOffset:%s ", +mQuerySize, mQueryOffset);
 
