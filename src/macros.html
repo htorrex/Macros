@@ -24,69 +24,59 @@
     <script src="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js"></script>
     <script src="http://rawgit.com/vitalets/x-editable/master/dist/bootstrap3-editable/js/bootstrap-editable.js"></script>
 
-    <script src="//api.backendless.com/sdk/js/v4/beta/backendless.min.js"></script>
-    <script src="app_js/app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase-firestore.js"></script>
+
     <script src="js/utilities.js"></script>
+    <script src="app_js/firebase_app.js"></script>
+
+    <script src="https://cdn.firebase.com/libs/firebaseui/2.5.1/firebaseui.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/2.5.1/firebaseui.css"/>
+
+
 </head>
 <body>
 <script>
 
-    var mCurrentUser;
-    var mQueryBuilder;
-    var mQuerySize = 100;
-    var mQueryOffset = 0;
-    var mQuerySorted = ["food"];
-    var mQuerySortedConsumption = ["dietFood"];
-    var mTotalMacros = [];
-
     $(function () {
-        console.log("*********  333  **********");
-        // if true, it means there is a persistent login
-        if (Backendless.UserService.isValidLogin()) {
-            mCurrentUser = Backendless.UserService.loggedInUser();
-            console.log("saved userId - " + mCurrentUser);
-            if (mCurrentUser == null) {
-                // redirect to login.
-                window.location.href = "index.html";
-            }
-//            currentUser = Backendless.Data.of(Backendless.User).findById(userId);
-        } else {
-            console.log("** logging in - there is no previous saved login");
-            $('#eventDanger').show();
-            $('#eventDanger').append("<br>there is no previous saved login ");
-
-            // redirect to login.
-            window.location.href = "index.html";
-        }
+        console.log("-----  333  ----");
+        loadMacros();
     });
 
     $(document).ready(function () {
-        console.log("*********  2222  .ready() **********");
-        loadConsumption();
-
-        // reset values
-        resetGlobalValues();
-        loadMacrosInit(mQueryBuilder);
+        console.log("----  2222  .ready() ----");
+        firebase.auth().onAuthStateChanged(function (user) {
+            if (user) {
+                // User is signed in.
+                console.log("* currentUser: " + user.displayName);
+                console.log("* currentUserID: " + user.uid);
+                document.getElementById("loggedUser").innerHTML = '<b>' + "Hola: " + user.displayName + '</b>';
+                currentUser = user;
+                $.getScript("app_js/firebase_listeners.js");
+                loadConsumption();
+            } else {
+                // No user is signed in.
+                $('#loggedUser').append("No user signed in");
+                window.location.href = "index.html";
+            }
+        });
     });
 
-    function logout() {
-        Backendless.UserService.logout()
-            .then(function () {
-                console.log("<< Logged out");
-                window.location.href = "index.html";
-            })
-            .catch(function (error) {
-                console.log("<< Error trying to logout");
-            });
+    /// ======= Begin MACROS =======
+
+    function loadMacros() {
+        console.log("======= loadMacros() ======= ");
+        macrosCollection.get().then(successLoading).catch(handleError);
     }
 
-
-    /// ======= Inicio MACROS =======
-
-    function loadMacrosInit(queryBuilder) {
-        Backendless.Data.of(MACROS_TABLE).find(queryBuilder)
-            .then(handleResult)
-            .catch(handleError);
+    function successLoading(querySnapshot) {
+        mTotalMacros = []; // cleaning data.
+        querySnapshot.forEach(function (refDoc) {
+            // console.log(refDoc.id, " => ", refDoc.data());
+            mTotalMacros.push(refDoc.data()); // adding each value to the table
+        });
+        console.log("< mTotalMacros.length: "+ mTotalMacros.length);
+        $('#macrosTable').bootstrapTable("load", mTotalMacros); // printing data macros table
     }
 
     function handleError(error) {
@@ -98,74 +88,166 @@
         $('#eventDanger').append("<br>Got an error loading - " + error);
     }
 
-    function handleResult(macrosResponse) {
-        console.log("<< macrosResponse.length: " + macrosResponse.length);
-//        printMacrosCollection(macrosResponse);
 
-        // Add the contents of one array to another
-        mTotalMacros.push.apply(mTotalMacros, macrosResponse);
+    function addRowMacros() {
+        console.log("Adding Row x!!");
+        const randomId = guid();
+        console.log("randomId: %s", randomId);
 
-        if (macrosResponse.length > 0) {
-            console.log("<< Next collection");
-            mQueryBuilder.prepareNextPage();
+        var newRow = {
+            docId: randomId,
+            brand: "no brand",
+            protein: 0,
+            fat: 0,
+            carb: 0,
+            fiber: 0,
+            grams: 0,
+            name: "new food"
+        };
 
-            console.log("<< cleaning before adding new array.");
-            $('#macrosTable').bootstrapTable("removeAll");
+        // Persist on FireBase
+        macrosCollection.add(newRow).then(function (savedDoc) {
+            console.log("Document written with ID: ", savedDoc.id);
+            const newDocRef = macrosCollection.doc(savedDoc.id);
 
-            loadMacrosInit(mQueryBuilder);
+            newDocRef.update({
+                docId: savedDoc.id
+            }).then(function () {
+                newRow.docId = savedDoc.id;
+                console.log("Document successfully updated!");
+
+                // add row with the new food
+                $('#macrosTable').bootstrapTable('insertRow', {
+                        index: 0, row: (newRow)
+                    });
+
+            }).catch(function (error) {
+                console.error("Error updating document: ", error);
+            })
+        }).catch(function (error) {
+            console.error("Error adding document: ", error);
+        });
+    }
+
+
+    // remove Macros
+    function removeMacros() {
+        var selections = $('#macrosTable').bootstrapTable('getSelections');
+        var ids = $.map(selections, function (row) {
+            console.log("- row.id: " + row.docId);
+            return row.docId;
+        });
+
+        console.log("selections.length: " + ids.length);
+
+        if (ids.length > 0) {
+            for (var j = 0; j < ids.length; j++) {
+                var selectedMacros = macrosCollection.doc(ids[j]);
+
+                // removing intake document fireStore.
+                selectedMacros.delete().then(function () {
+                    console.log("Macros Document successfully deleted!");
+
+                    // removing rows from the table
+                    $('#macrosTable').bootstrapTable('remove', {
+                        field: 'docId',
+                        values: ids
+                    });
+                }).catch(function (error) {
+                    console.log("Error removing Macros document: ", error);
+                });
+            }
         } else {
-            console.log("<< Reached the end of collection");
-            console.log("<< before Load");
-            $('#macrosTable').bootstrapTable("load", mTotalMacros);
+            console.log("Select an Item, please");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br><b>Select an Item, please</b>");
         }
     }
 
-    function printMacrosCollection(macrosCollection) {
-        console.log("Loaded " + macrosCollection.length +
-            " restaurants in the current page");
 
-        for (var i in macrosCollection)
-            console.log("\t" + macrosCollection[i].food);
+    // add food to new table
+    function addFood() {
+        const addSelections = $('#macrosTable').bootstrapTable('getSelections');
+        console.log("selections.length: " + addSelections.length);
+
+        if (addSelections.length > 0) {
+            for (var k = 0; k < addSelections.length; k++) { // if we use checkbox we will need use the for loop
+
+                const intakeId = guid();
+                console.log("intakeId: %s", intakeId);
+
+                const consumptionRow = {
+                    docId: intakeId,
+                    intakeFood: addSelections[k].name,
+                    intakeGrams: addSelections[k].grams,
+                    intakeProtein: addSelections[k].protein,
+                    intakeFat: addSelections[k].fat,
+                    intakeCarbs: addSelections[k].carb,
+                    intakeFiber: addSelections[k].fiber,
+                    macroId: addSelections[k].docId,
+                    intakeDate: getTodaysDayFormat(0),
+                    userId: currentUser.uid //current user
+                };
+
+                // $('#consumptionTable').bootstrapTable('insertRow', {
+                //     index: i, row: (consumptionRow)
+                // });
+
+                console.log("_name_Before_saving: " + addSelections[k].name);
+
+                // Persist intake on FireBase
+                intakeCollection.add(consumptionRow).then(function (savedIntakeDoc) {
+                    console.log("Document written with ID: ", savedIntakeDoc.id);
+                    const newIntakeDocRef = intakeCollection.doc(savedIntakeDoc.id);
+
+                    newIntakeDocRef.update({
+                        docId: savedIntakeDoc.id
+                    }).then(function () {
+                        newIntakeDocRef.docId = savedIntakeDoc.id;
+                        console.log("Intake Document successfully updated!");
+                        totalMacrosTable();
+                    }).catch(function (error) {
+                        console.error("Error updating Intake document: ", error);
+                    })
+                }).catch(function (error) {
+                    console.error("Error adding Intake document: ", error);
+                });
+            }
+        } else {
+            console.log("Select an Item, please");
+            $('#eventDanger').show();
+            $('#eventDanger').append("<br><b>Select an Item, please</b>");
+        }
     }
+
 
     /// ======= FIN MACROS =======
 
 
     /// ======= INICIO CONSUMO DIARIO =======
 
-    // Load Consumption
     function loadConsumption() {
-        var consumption;
-        var whereClause =
-            "userId = '" + mCurrentUser + "' AND created after '" + getTodaysDayFormat(0) + " " + calculateHoursTimeZone(":00:00") +
-            "' AND created before '" + getTodaysDayFormat(1) + " " + calculateHoursTimeZone(":59:59") + "'";
+        var start = getTodaysDayFormat(0);
+        // var end = getTodaysDayFormat(0);
+        console.log("===== loadConsumption() ====");
 
-        console.log("where: " + whereClause);
-
-        var consumptionQuery = Backendless.DataQueryBuilder.create();
-        consumptionQuery.setWhereClause(whereClause)
-            .setPageSize(mQuerySize)
-            .setOffset(mQueryOffset)
-            .setSortBy(mQuerySortedConsumption);
-
-        Backendless.Data.of(CONSUMPTION_TABLE).find(consumptionQuery)
-            .then(function (result) {
-                console.log("result.length - " + result.length);
-                for (i = 0; i < result.length; i++) {
-                    console.log("consumption property name - " + result[i].food);
-                }
-                consumption = result;
-                print(consumption);
-                $('#consumptionTable').bootstrapTable("load", consumption);
-
-                // call the function to do the sum.
-                totalMacrosTable();
-            })
-            .catch(function (error) {
-                console.log("got error loading consumption - " + error);
-                $('#eventDanger').show();
-                $('#eventDanger').append("<br>Got an error loading - " + error);
-            });
+        console.log("<< start: " + start);
+        console.log("<< currentUser.uid: " + currentUser.uid);
+        var mIntakes = [];
+        // TODO review this query for now just checking the intakeDate to match with this format 08/13/2017
+        intakeCollection.where('userId', "==", currentUser.uid).where('intakeDate', '==', start)
+            .get()
+            .then(function (qSnap) {
+                qSnap.forEach(function (doc) {
+                    console.log("<< YES ---");
+                    console.log(doc.id, " => ", doc.data());
+                    mIntakes.push(doc.data()); // adding each value to the table
+                    $('#consumptionTable').bootstrapTable("load", mIntakes); // printing data intake table
+                    totalMacrosTable();
+                });
+            }).catch(function (error) {
+            console.log("<< something wrong ----", error);
+        });
     }
 
     // Operations on totals
@@ -220,152 +302,31 @@
         fiberField.innerHTML = totalFiber;
     }
 
-    // remove product
-    function removeMacros() {
-        var selections = $('#macrosTable').bootstrapTable('getSelections');
-        console.log("selections.length: " + selections.length);
-
-        if (selections.length > 0) {
-            for (i = 0; i < selections.length; i++) { // if we use checkbox we will need use the for loop
-                Backendless.Data.of(MACROS_TABLE).remove({
-                    objectId: selections[i].objectId
-                })
-                    .then(function (timestamp) {
-                        console.log("object removed: " + timestamp);
-
-                        // reset values
-                        resetGlobalValues();
-                        loadMacrosInit(mQueryBuilder);
-                    })
-                    .catch(function (error) {
-                        console.log("got error removing - " + error);
-                        $('#eventDanger').show();
-                        $('#eventDanger').append("<br>Got an error removing - " + error);
-                    })
-            }
-        } else {
-            console.log("Select an Item, please");
-            $('#eventDanger').show();
-            $('#eventDanger').append("<br><b>Select an Item, please</b>");
-        }
-    }
-
-
-    // add food to new table
-    function addFood() {
-        var addSelections = $('#macrosTable').bootstrapTable('getSelections');
-        console.log("selections.length: " + addSelections.length);
-
-        if (addSelections.length > 0) {
-            for (i = 0; i < addSelections.length; i++) { // if we use checkbox we will need use the for loop
-
-                var consumptionRow = {
-                    dietFood: addSelections[i].food,
-                    dietGrams: addSelections[i].grams,
-                    dietProteins: addSelections[i].proteins,
-                    dietFats: addSelections[i].fats,
-                    dietCarbs: addSelections[i].carbs,
-                    dietFiber: addSelections[i].fiber,
-                    macroId: addSelections[i].objectId,
-                    userId: mCurrentUser
-                };
-
-                $('#consumptionTable').bootstrapTable('insertRow', {
-                    index: i, row: (consumptionRow)
-                });
-
-                console.log("_name_Before_saving: " + addSelections[i].food);
-
-                // Saving on Consumption Table
-                Backendless.Data.of(CONSUMPTION_TABLE).save(consumptionRow)
-                    .then(function (obj) {
-                        console.log("_object saved in consumption objectId " + obj.objectId);
-                        console.log("_name_after_saving: " + obj.dietFood);
-                        loadConsumption();
-                    }).catch(function (error) {
-                    console.log("got error saving - consumption" + error);
-                    $('#eventDanger').show();
-                    $('#eventDanger').append("<br>Got an error saving - " + error);
-                });
-            }
-        } else {
-            console.log("Select an Item, please");
-            $('#eventDanger').show();
-            $('#eventDanger').append("<br><b>Select an Item, please</b>");
-        }
-    }
-
-    function print(macros) {
-        console.log(macros);
-    }
-
-    //    function refreshMacros() {
-    //        console.log("Hello! I am an alert box3!!");
-    //        $('#macrosTable').bootstrapTable("refresh", loadMacros());
-    //        $('#eventSuccess').show();
-    //        $('#eventSuccess').append("<br>Data refreshed!");
-    //    }
-
-    function addRowMacros() {
-        console.log("Adding Row!!");
-//        var randomId = 100 + ~~(Math.random() * 100);
-//        console.log("randomId: %s", randomId);
-
-        var newFood = {
-            food: "",
-            grams: "0",
-            proteins: "0",
-            fats: "0",
-            carbs: "0",
-            fiber: "0",
-            brand: ""
-        };
-
-
-        // insert in table
-        $('#macrosTable').bootstrapTable("insertRow", {
-            index: 0,
-            row: (newFood)
+    function removeConsumption() {
+        var intakeSelections = $('#consumptionTable').bootstrapTable('getSelections');
+        var intakeIds = $.map(intakeSelections, function (row) {
+            return row.docId;
         });
 
-        // persist on Backend Less
-        Backendless.Data.of(MACROS_TABLE).save(newFood)
-            .then(function (obj) {
-                console.log("object saved. objectId " + obj.objectId);
-                console.log("name: " + obj.food);
-                console.log("prot111: " + obj.proteins);
+        console.log("Intake selections.length: " + intakeIds.length);
 
-                // reset values
-                resetGlobalValues();
-                loadMacrosInit(mQueryBuilder);
+        if (intakeIds.length > 0) {
+            for (var j = 0; j < intakeIds.length; j++) {
+                var selectedIntakeDocRef = intakeCollection.doc(intakeIds[j]);
 
-//                $('#eventSuccess').show();
-//                $('#eventSuccess').append("<br>Saved!");
-            }).catch(function (error) {
-            console.log("got error saving - " + error);
-            $('#eventDanger').show();
-            $('#eventDanger').append("<br>Got an error saving - " + error);
-        })
-    }
+                // removing intake document fireStore.
+                selectedIntakeDocRef.delete().then(function () {
+                    console.log("Intake Document successfully deleted!");
 
-    function removeConsumption() {
-        var selections = $('#consumptionTable').bootstrapTable('getSelections');
-        console.log("consumption selections.length: " + selections.length);
-
-        if (selections.length > 0) {
-            for (i = 0; i < selections.length; i++) { // if we use checkbox we will need use the for loop
-                Backendless.Data.of(CONSUMPTION_TABLE).remove({
-                    objectId: selections[i].objectId
-                })
-                    .then(function (timestamp) {
-                        console.log("consumption object removed: " + timestamp);
-                        loadConsumption();
-                    })
-                    .catch(function (error) {
-                        console.log("got error removing - " + error);
-                        $('#eventDanger').show();
-                        $('#eventDanger').append("<br>Got an error removing - " + error);
-                    })
+                    // removing rows from the table
+                    $('#consumptionTable').bootstrapTable('remove', {
+                        field: 'docId',
+                        values: intakeIds
+                    });
+                    totalMacrosTable();
+                }).catch(function (error) {
+                    console.log("Error removing Intake document: ", error);
+                });
             }
         } else {
             console.log("Select an Item, please");
@@ -374,6 +335,11 @@
         }
     }
 
+    function logout() {
+        console.log("logout()");
+        firebase.auth().signOut();
+        window.location.href = "index.html";
+    }
 
     /// ======= inicio CUSTOM EVENTS =======
 
@@ -381,7 +347,7 @@
     // custom actions table.
     $(function () {
 
-        console.log("*********  1111  **********");
+        console.log("-----  1111  ----");
 
         // hiding column for Grams
         $("#collapseGrams").addClass("out");
@@ -395,28 +361,41 @@
         });
 
         $('#closeModal').click(function () {
-            console.log("2222  Uncheking the rows and reset the search");
+            console.log("2222  Uncheking  reset search the rows and reset the search");
             $('#macrosTable').bootstrapTable('resetSearch');
-            $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+            // $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
         });
 
         // onDblClickCell
         $('#macrosTable').on('dbl-click-row.bs.table', function (e, row, $element) {
-//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("doble click row!!");
+            console.log("row.docId: " + row.docId);
             console.log("food: " + row.food);
+        });
+
+        // onCheck Intake
+        $('#consumptionTable').on('check.bs.table', function (e, row, $element) {
+            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("< Click en Consumption!!");
+            console.log("< objectID: " + row.docId);
+            console.log("< row.food: " + row.name);
+        });
+
+        // onUncheck Intake
+        $('#consumptionTable').on('uncheck.bs.table', function (e, row, $element) {
+            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            console.log("UnCheck Consumption!!");
+            console.log("row.docId: " + row.docId);
+            console.log("food: " + row.name);
         });
 
         // onCheck
         $('#macrosTable').on('check.bs.table', function (e, row, $element) {
-//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("< Click en Fila!!");
-            console.log("< objectID: " + row.objectId);
-            console.log("< row.food: " + row.food);
-
-//            lastSelection = row;
-//            console.log("< lastSelection.objectID: " + lastSelection.objectId);
-//            console.log("< lastSelection.food: " + lastSelection.food);
+            console.log("< objectID: " + row.docId);
+            console.log("< row.food: " + row.name);
         });
 
         $('#macrosTable').on('page-change.bs.table', function (e, number, size, search) {
@@ -424,24 +403,22 @@
             console.log("number:" + number); //page 2
             console.log("size:" + size); // size 10
             // custom offset
-//            var offset = (number - 1) * size;
-//            loadMacros(offset, size);
+            //            var offset = (number - 1) * size;
+            //            loadMacros(offset, size);
         });
 
         // onUncheck
         $('#macrosTable').on('uncheck.bs.table', function (e, row, $element) {
-//            $('#eventsResult').text('Event: dbl-click-row.bs.table');
+            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("UnCheck Fila!!");
-            console.log("food: " + row.food);
+            console.log("row.docId: " + row.docId);
+            console.log("food: " + row.name);
         });
 
-        // onRefresh Macros
+        // // onRefresh Macros
         $('#macrosTable').on('refresh.bs.table', function (e, data) {
             console.log("<< Refresh Table!!");
-
-            // reset values
-            resetGlobalValues();
-            loadMacrosInit(mQueryBuilder);
+            loadMacros(); // force to get the collection again.
         });
 
         // update macros values.
@@ -449,36 +426,27 @@
             console.log(":::: MACROS TABLE ENTER :::");
             console.log("field: " + field);
 
-            var saveFood = {
-                objectId: row.objectId,
-                food: row.food.toString(),
-                grams: row.grams.toString(),
-                proteins: row.proteins.toString(),
-                fats: row.fats.toString(),
-                carbs: row.carbs.toString(),
-                fiber: row.fiber.toString(),
-                brand: row.brand.toString()
+            // fields to update in the document
+            const savedFood = {
+                docId: row.docId,
+                name: row.name,
+                grams: row.grams,
+                protein: row.protein,
+                fat: row.fat,
+                carb: row.carb,
+                fiber: row.fiber,
+                brand: row.brand
             };
 
-            console.log("**** saveFood.ObjectID: " + saveFood.objectId);
+            console.log("- savedFood.DocId: " + savedFood.docId);
 
-            // update row and table.
-            Backendless.Data.of(MACROS_TABLE).save(saveFood)
-                .then(function (obj) {
-                    console.log("object update in saveFood objectId " + obj.objectId);
-                    console.log("name saveFood: " + obj.food);
-
-                    // reset values
-                    resetGlobalValues();
-                    loadMacrosInit(mQueryBuilder);
-
-//                        $('#eventSuccess').show();
-//                        $('#eventSuccess').append("<br>Saved!");
-                }).catch(function (error) {
-                console.log("got error update - consumption" + error);
-                $('#eventDanger').show();
-                $('#eventDanger').append("<br>Got an error saving - " + error);
-            })
+            const savedDocRef = macrosCollection.doc(row.docId);
+            // update document.
+            savedDocRef.update(savedFood).then(function () {
+                console.log("Document successfully updated!");
+            }).catch(function (error) {
+                console.error("Error updating document: ", error);
+            });
         });
 
         // data hide alert
@@ -502,8 +470,40 @@
             console.log("row.totalConsumed : " + row.totalConsumed);
             console.log("row.totalPending : " + row.totalPending);
 
-
         });
+
+        // $('#macrosTable').on('search.bs.table', function () {
+        //
+        //
+        //     console.log("****************");
+        //
+        //
+        //
+        //     var $search = $('#macrosTable').data('bootstrap.table')
+        //         .$toolbar.find('.search input');
+        //     $search.attr('placeholder', 'Search');
+        //
+        //     console.log("search.length: "+$search.length);
+        //
+        //     if($search.length > 0){
+        //         console.log("<< search: "+$search[0].value);
+        //
+        //         // TODO add search results
+        //         var macroSearch = [];
+        //         macrosCollection.orderBy("name", "asc").startAt($search[0].value).limit(10)
+        //             .get()
+        //             .then(function (querySearchSnapshot) {
+        //                 querySearchSnapshot.forEach(function (docSearch) {
+        //                     console.log("** Search loop **");
+        //                     console.log(docSearch.id, " => ", docSearch.data());
+        //                     macroSearch.push(docSearch.data());
+        //                     $('#macrosTable').bootstrapTable("load", macroSearch);
+        //                 });
+        //             }).catch(function (error) {
+        //             console.log("<< something wrong ----", error);
+        //         });
+        //     }
+        // });
 
         // Consumption table
         // update data
@@ -511,53 +511,57 @@
         $('#consumptionTable').on('editable-save.bs.table', function (e, field, row, old, $el) {
             console.log("::: CONSUMPTION TABLE DATA :::");
             console.log("field: " + field);
-            if (field == "dietGrams") {
-                console.log("< row.macroId :" + row.macroId);
 
-                Backendless.Data.of(MACROS_TABLE).findById(row.macroId)
-                    .then(function (result) {
+            if (field == "intakeGrams") {
+                console.log("< intake - row.macroId :" + row.macroId);
 
-                        row.dietProteins = result.proteins * row.dietGrams / result.grams;
+                const macroDocRef = macrosCollection.doc(row.macroId);
 
-                        row.dietFats = result.fats * row.dietGrams / result.grams;
-                        row.dietCarbs = result.carbs * row.dietGrams / result.grams;
-                        row.dietFiber = result.fiber * row.dietGrams / result.grams;
+                // getting the Macro document
+                macroDocRef.get().then(function (macroDoc) {
+                    if (macroDoc.exists) {
+                        console.log("Document data:", macroDoc.data());
 
-                        console.log("new Proteins: " + row.dietProteins);
-                        console.log("new Fats: " + row.dietFats);
-                        console.log("new Carbs: " + row.dietCarbs);
-                        console.log("new Fiber: " + row.dietFiber);
+                        row.intakeProtein = macroDoc.data().protein * row.intakeGrams / macroDoc.data().grams;
+                        row.intakeFat = macroDoc.data().fat * row.intakeGrams / macroDoc.data().grams;
+                        row.intakeCarbs = macroDoc.data().carb * row.intakeGrams / macroDoc.data().grams;
+                        row.intakeFiber = macroDoc.data().fiber * row.intakeGrams / macroDoc.data().grams;
 
-                        console.log("&&&&& ObjectID: " + row.objectId);
+                        console.log("new Proteins: " + row.intakeProtein);
+                        console.log("new Fats: " + row.intakeFat);
+                        console.log("new Carbs: " + row.intakeCarbs);
+                        console.log("new Fiber: " + row.intakeFiber);
 
-                        var consumption = {
-                            objectId: row.objectId,
-                            dietGrams: row.dietGrams.toString(),
-                            dietProteins: row.dietProteins.toString(),
-                            dietFats: row.dietFats.toString(),
-                            dietCarbs: row.dietCarbs.toString(),
-                            dietFiber: row.dietFiber.toString()
+                        console.log("&&&&& ObjectID: " + row.docId);
+
+                        // update Intake Table
+                        const intakeData = {
+                            docId: row.docId,
+                            intakeGrams: row.intakeGrams,
+                            intakeProtein: row.intakeProtein,
+                            intakeFat: row.intakeFat,
+                            intakeCarbs: row.intakeCarbs,
+                            intakeFiber: row.intakeFiber
                         };
 
-                        console.log("**** consumption.ObjectID: " + consumption.objectId);
+                        // update in firebase
+                        const intakeDocRef = intakeCollection.doc(row.docId);
+                        // update document.
+                        intakeDocRef.update(intakeData).then(function () {
+                            console.log("Document Intake table successfully updated!");
+                            totalMacrosTable();
+                        }).catch(function (error) {
+                            console.error("Error updating Intake table: ", error);
+                        });
 
-                        // update row and table.
-                        Backendless.Data.of(CONSUMPTION_TABLE).save(consumption)
-                            .then(function (obj) {
-                                console.log("object update in consumption objectId " + obj.objectId);
-                                console.log("name: " + obj.food);
-                                loadConsumption();
-//                        $('#eventSuccess').show();
-//                        $('#eventSuccess').append("<br>Saved!");
-                            }).catch(function (error) {
-                            console.log("got error update - consumption" + error);
-                            $('#eventDanger').show();
-                            $('#eventDanger').append("<br>Got an error saving - " + error);
-                        })
-                    })
-                    .catch(function (error) {
-                        console.log("ID not found." + error);
-                    });
+                    } else {
+                        console.log("No such document!");
+                    }
+
+                }).catch(function (error) {
+                    console.error("Error updating document: ", error);
+                });
+
             } else {
                 console.log("::: we dont care :::");
             }
@@ -566,48 +570,6 @@
 
     /// ======= fin CUSTOM EVENTS =======
 
-    // save product
-    //    function save() {
-    //
-    //        var selections = $('#macrosTable').bootstrapTable('getSelections');
-    //        console.log("selections.length: " + selections.length);
-    //
-    //        if (selections.length > 0) {
-    //            console.log("<< selection to save: " + selections[0].food);
-    //            if (selections[0].food.trim() == "" || selections[0].grams.trim() == ""
-    //                || selections[0].proteins.trim() == "" || selections[0].fats.trim() == "" || selections[0].carbs.trim() == "") {
-    //                $('#eventDanger').show();
-    //                $('#eventDanger').append("<br><b>Enter a value please</b>");
-    //                return
-    //            }
-    //            Backendless.Data.of(MACROS_TABLE).save({
-    //                food: selections[0].food,
-    //                grams: selections[0].grams,
-    //                proteins: selections[0].proteins,
-    //                fats: selections[0].fats,
-    //                carbs: selections[0].carbs,
-    //                fiber: selections[0].fiber,
-    //                brand: selections[0].brand
-    //            }).then(function (obj) {
-    //                console.log("<< object saved. objectId " + obj.objectId);
-    //                console.log("name: " + obj.food);
-    //                console.log("*prot111: " + obj.proteins);
-    //                loadMacros();
-    //                $('#eventSuccess').show();
-    //                $('#eventSuccess').append("<br>Saved!");
-    //            }).catch(function (error) {
-    //                console.log("got error saving - " + error);
-    //                $('#eventDanger').show();
-    //                $('#eventDanger').append("<br>Got an error saving - " + error);
-    //            })
-    //        } else {
-    //            console.log("Select an Item, please");
-    //            $('#eventDanger').show();
-    //            $('#eventDanger').append("<br><b>Select an Item, please</b>");
-    ////            $('#eventsDanger').text('Select an Item, please');
-    //        }
-    //    }
-
 </script>
 
 <!--<div class="alert alert-success" id="eventsResult">-->
@@ -615,8 +577,9 @@
 <!--</div>-->
 
 <br>
-<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#macrosModal">Open Macros</button>
+<div class="alert alert-success" role="alert" id="loggedUser"></div>
 <button type="button" class="btn btn-danger" style="float: right;" onclick="logout()">Log out</button>
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#macrosModal">Open Macros</button>
 <br>
 <br>
 <div id="toolbarConsumption" class="btn-group">
@@ -639,12 +602,12 @@
     <tr>
         <!--<th data-radio="true"></th>-->
         <th data-checkbox="true"></th>
-        <th data-field="dietFood" data-sortable="true" data-editable="false">Food</th>
-        <th data-field="dietGrams" data-sortable="true" data-editable="true">Grams</th>
-        <th data-field="dietProteins" data-sortable="true" data-editable="false">Proteins</th>
-        <th data-field="dietFats" data-sortable="true" data-editable="false">Fats</th>
-        <th data-field="dietCarbs" data-sortable="true" data-editable="false">Carbs</th>
-        <th data-field="dietFiber" data-sortable="true" data-editable="false">Fiber</th>
+        <th data-field="intakeFood" data-sortable="true" data-editable="false">Food</th>
+        <th data-field="intakeGrams" data-sortable="true" data-editable="true">Grams</th>
+        <th data-field="intakeProtein" data-sortable="true" data-editable="false">Proteins</th>
+        <th data-field="intakeFat" data-sortable="true" data-editable="false">Fats</th>
+        <th data-field="intakeCarbs" data-sortable="true" data-editable="false">Carbs</th>
+        <th data-field="intakeFiber" data-sortable="true" data-editable="false">Fiber</th>
         <!--<th data-field="dietGramsOld" id="collapseGrams" class="collapse out" data-sortable="false" data-editable="false">Old Grams</th>-->
     </tr>
     </thead>
@@ -749,7 +712,8 @@
                        data-id-field="id"
                        data-pagination="true"
                        data-page-list="[10, 50, 100, All]"
-                       data-page-size="10"
+                       data-side-pagination="client"
+                       data-page-size="15"
                        data-click-to-select="true"
                        data-editable-emptytext="This field is empty"> <!-- data-query-params="queryParams" -->
                     <thead>
@@ -757,11 +721,12 @@
                         <!--<th data-radio="true"></th>-->
                         <th data-checkbox="true"></th>
                         <!--<th data-formatter="indexFormatter">Id</th>-->
-                        <th data-field="food" data-sortable="true" data-editable="true">Food</th>
+                        <th data-field="docId" data-sortable="true" data-editable="false" data-visible="false">id</th>
+                        <th data-field="name" data-sortable="true" data-editable="true">Food</th>
                         <th data-field="grams" data-sortable="true" data-editable="true">Grams</th>
-                        <th data-field="proteins" data-sortable="true" data-editable="true">Proteins</th>
-                        <th data-field="fats" data-sortable="true" data-editable="true">Fats</th>
-                        <th data-field="carbs" data-sortable="true" data-editable="true">Carbs</th>
+                        <th data-field="protein" data-sortable="true" data-editable="true">Proteins</th>
+                        <th data-field="fat" data-sortable="true" data-editable="true">Fats</th>
+                        <th data-field="carb" data-sortable="true" data-editable="true">Carbs</th>
                         <th data-field="fiber" data-sortable="true" data-editable="true">Fiber</th>
                         <th data-field="brand" data-sortable="true" data-editable="true">Brand</th>
                     </tr>
@@ -780,7 +745,9 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="button" id="uncheckAll" class="btn btn-success" onclick="addFood()" data-dismiss="modal">Add food</button>
+                <button type="button" id="uncheckAll" class="btn btn-success" onclick="addFood()" data-dismiss="modal">
+                    Add food
+                </button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->

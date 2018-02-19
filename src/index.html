@@ -15,107 +15,80 @@
     <!-- Custom styles for this template -->
     <link href="css/login.css" rel="stylesheet">
 
-    <script src="//api.backendless.com/sdk/js/v4/beta/backendless.min.js"></script>
-    <script src="app_js/app.js"></script>
+    <!--<script src="//api.backendless.com/sdk/js/v4/beta/backendless.min.js"></script>-->
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase-firestore.js"></script>
+
     <script src="js/jquery-3.2.1.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.9.0/firebase-firestore.js"></script>
+
     <script src="js/utilities.js"></script>
+    <script src="app_js/firebase_app.js"></script>
+    <!--<script src="app_js/firebase_listeners.js"></script>-->
+
+    <!--<script src="https://cdn.firebase.com/libs/firebaseui/2.5.1/firebaseui.js"></script>-->
+    <!--<link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/2.5.1/firebaseui.css"/>-->
 
 </head>
+<!-- The code below initializes the sign-in widget from FirebaseUI web. -->
+<script src="https://cdn.firebase.com/libs/firebaseui/2.5.1/firebaseui.js"></script>
+<script src="https://www.gstatic.com/firebasejs/4.9.0/firebase-firestore.js"></script>
 
-<body>
+<script type="text/javascript">
 
-<script>
+    var uiConfig = {
+        signInSuccessUrl: 'macros.html',
+        signInOptions: [
+            // Specify providers you want to offer your users.
+            firebase.auth.EmailAuthProvider.PROVIDER_ID
+        ],
+        // Terms of service url can be specified and will show up in the widget.
+        tosUrl: '<your-tos-url>'
+    };
 
-    $(function () {
-        console.log("*********  Events  **********");
-        // data hide alert
-        $('#closeDangerLogin').on("click", function () {
-            console.log("<< hiding bar danger");
-            $('#eventDangerLogin').hide();
-        });
+    // Initialize the FirebaseUI Widget using Firebase.
+    var ui = new firebaseui.auth.AuthUI(firebase.auth());
 
-        $('#closeSuccessLogin').on("click", function () {
-            console.log("<< hiding bar success");
-            $('#eventSuccessLogin').hide();
-        });
-
-    });
-
-
-    $(document).ready(function () {
-        $("#btnLogin").click(function () {
-            console.log("btnEntrar click");
-            login();
-        });
-    });
-
-    function login() {
-        console.log("<<<<<<<<*  Login ");
-        var email = document.getElementById('inputEmail').value;
-        var password = document.getElementById('inputPassword').value;
-
-        console.log("<<  email: " + email);
-        console.log("<<  password: " + password);
-
-        var validData = true;
-
-        $(".form-control").each(function () {
-            if ($(this).val() === "")
-                validData = false;
-        });
-
-        if (!validData) {
-            $('#eventDangerLogin').show();
-            $('#eventDangerLogin').append("<br>Please insert right information.");
-            return;
-        }
-
-        Backendless.UserService.login(email, password, false)
-            .then(userLoggedIn)
-            .catch(gotError);
-    }
-
-    function userLoggedIn(user) {
-        console.log("<< 1 user has logged in: " + user.email);
-        $('#eventSuccessLogin').show();
-        $('#eventSuccessLogin').append("<br>Welcome: - " + user.name);
-        $(".form-signin").submit();
-    }
-
-    function gotError(error) {
-        console.log("<< error message - " + error.message);
-        console.log("<< error code - " + error.statusCode);
-        $('#eventDangerLogin').show();
-        $('#eventDangerLogin').append("<br>Got an error login: - " + error.message);
-    }
+    // The start method will wait until the DOM is loaded.
+    ui.start('#firebaseui-auth-container', uiConfig);
 
 </script>
 
-<div class="container">
+<div></div>
+<body>
+<h1 align="center" style="color:black;">Macros WebApp</h1>
+<div id="firebaseui-auth-container"></div>
 
-    <div class="alert alert-success alert-dismissible" role="alert" id="eventSuccessLogin" hidden="hidden">
-        <a href="#" class="close" aria-label="closeSuccess" id="closeSuccessLogin">×</a>
-    </div>
+<!-- A simple example script to add text to the page that displays the user's Display Name and Email -->
+<script>
+    // Track the UID of the current user.
+    var currentUid = null;
+    firebase.auth().onAuthStateChanged(function(user) {
+        // onAuthStateChanged listener triggers every time the user ID token changes.
+        // This could happen when a new user signs in or signs out.
+        // It could also happen when the current user ID token expires and is refreshed.
+        if (user && user.uid != currentUid) {
+            // Update the UI when a new user signs in.
+            // Otherwise ignore if this is a token refresh.
+            // Update the current user UID.
+            currentUid = user.uid;
+            currentUser = user;
+            document.body.innerHTML = '<h3> Congrats ' + user.displayName + ', you are done! </h3> Redirecting to Macros App';
+        } else {
+            // Sign out operation. Reset the current user UID.
+            currentUid = null;
+            console.log("no user signed in");
+            $('#eventDangerLogin').show();
+            $('#eventDangerLogin').append("<br>No user signed in: - " + error.message);
+        }
+    });
+</script>
 
-    <div class="alert alert-danger alert-dismissible" role="alert" id="eventDangerLogin" hidden="hidden">
-        <a href="#" class="close" aria-label="close" id="closeDangerLogin">&times;</a>
-    </div>
-
-    <form class="form-signin" method="post" action="macros.html"> <!--  action="macros.html" method="post" -->
-        <h2 class="form-signin-heading">Login to Macros App</h2>
-        <label for="inputEmail" class="sr-only">Email address</label>
-        <input type="email" id="inputEmail" class="form-control" placeholder="Email address" required autofocus>
-        <label for="inputPassword" class="sr-only">Password</label>
-        <input type="password" id="inputPassword" class="form-control" placeholder="Password" required>
-        <div class="checkbox">
-            <!--<label>-->
-            <!--<input type="checkbox" value="remember-me"> Remember me-->
-            <!--</label>-->
-        </div>
-        <button class="btn btn-lg btn-primary btn-block" id="btnLogin" type="button">Login</button>
-    </form>
-
-</div> <!-- /container -->
+<div class="alert alert-danger alert-dismissible" role="alert" id="eventDangerLogin" hidden="hidden">
+    <a href="#" class="close" aria-label="close" id="closeDangerLogin">&times;</a>
+</div>
 
 </body>
 </html>
