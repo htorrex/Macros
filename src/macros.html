@@ -474,6 +474,21 @@
             // update document.
             savedDocRef.update(savedFood).then(function () {
                 console.log("Document successfully updated!");
+
+                // TODO update the row manually
+                $('#macrosTable').bootstrapTable('updateRow', {
+                    id: 0,
+                    row:  {
+                        name: row.name,
+                        grams: row.grams,
+                        protein: row.protein,
+                        fat: row.fat,
+                        carb: row.carb,
+                        fiber: row.fiber,
+                        brand: row.brand
+                    }
+                });
+
             }).catch(function (error) {
                 console.error("Error updating document: ", error);
             });
@@ -579,6 +594,19 @@
                         // update document.
                         intakeDocRef.update(intakeData).then(function () {
                             console.log("Document Intake table successfully updated!");
+
+                            // TODO update the row manually
+                            $('#consumptionTable').bootstrapTable('updateRow', {
+                                id: 0,
+                                row:  {
+                                    intakeGrams: row.intakeGrams,
+                                    intakeProtein: row.intakeProtein,
+                                    intakeFat: row.intakeFat,
+                                    intakeCarbs: row.intakeCarbs,
+                                    intakeFiber: row.intakeFiber
+                                }
+                            });
+
                             totalMacrosTable();
                         }).catch(function (error) {
                             console.error("Error updating Intake table: ", error);
@@ -625,13 +653,16 @@
        data-show-toggle="false"
        data-show-columns="false"
        data-show-export="true"
-       data-id-field="id"
+       data-sort-name="intakeFood"
+       data-id-field="docId"
+       data-unique-id="true"
        data-click-to-select="true"
        data-editable-emptytext="This field is empty" class="table table-bordered table table-striped">
     <thead>
     <tr>
         <!--<th data-radio="true"></th>-->
         <th data-checkbox="true"></th>
+        <th data-field="docId" data-sortable="true" data-editable="false" data-visible="false">docId</th>
         <th data-field="intakeFood" data-sortable="true" data-editable="false">Food</th>
         <th data-field="intakeGrams" data-sortable="true" data-editable="true">Grams</th>
         <th data-field="intakeProtein" data-sortable="true" data-editable="false">Proteins</th>
@@ -738,7 +769,8 @@
                        data-show-toggle="true"
                        data-show-columns="true"
                        data-show-export="true"
-                       data-id-field="id"
+                       data-id-field="docId"
+                       data-unique-id="true"
                        data-pagination="true"
                        data-page-list="[10, 50, 100, All]"
                        data-side-pagination="client"
@@ -750,7 +782,7 @@
                         <!--<th data-radio="true"></th>-->
                         <th data-checkbox="true"></th>
                         <!--<th data-formatter="indexFormatter">Id</th>-->
-                        <th data-field="docId" data-sortable="true" data-editable="false" data-visible="false">id</th>
+                        <th data-field="docId" data-sortable="true" data-editable="false" data-visible="false">docId</th>
                         <th data-field="name" data-sortable="true" data-editable="true">Food</th>
                         <th data-field="grams" data-sortable="true" data-editable="true">Grams</th>
                         <th data-field="protein" data-sortable="true" data-editable="true">Proteins</th>
