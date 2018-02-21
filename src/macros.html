@@ -52,7 +52,7 @@
                 console.log("* currentUserID: " + user.uid);
                 document.getElementById("loggedUser").innerHTML = '<b>' + "Hola: " + user.displayName + '</b>';
                 currentUser = user;
-                $.getScript("app_js/firebase_listeners.js");
+                // $.getScript("app_js/firebase_listeners.js"); // removing listeners for now.
                 loadConsumption();
             } else {
                 // No user is signed in.
@@ -75,7 +75,7 @@
             // console.log(refDoc.id, " => ", refDoc.data());
             mTotalMacros.push(refDoc.data()); // adding each value to the table
         });
-        console.log("< mTotalMacros.length: "+ mTotalMacros.length);
+        console.log("< mTotalMacros.length: " + mTotalMacros.length);
         $('#macrosTable').bootstrapTable("load", mTotalMacros); // printing data macros table
     }
 
@@ -118,8 +118,8 @@
 
                 // add row with the new food
                 $('#macrosTable').bootstrapTable('insertRow', {
-                        index: 0, row: (newRow)
-                    });
+                    index: 0, row: (newRow)
+                });
 
             }).catch(function (error) {
                 console.error("Error updating document: ", error);
@@ -164,16 +164,40 @@
         }
     }
 
+    function cleanSelections() {
+        console.log("cleanSelections()");
+        $('#macrosTable').bootstrapTable('resetSearch');
+        const cleanSelections = $('#macrosTable').bootstrapTable('getSelections');
+        console.log("Clean selections.length: " + cleanSelections.length);
+
+        if (cleanSelections.length > 0) {
+            var cleanRowsIds = $.map(cleanSelections, function (row) {
+                return row.docId;
+            });
+
+            // unchecking the rows.
+            $('#macrosTable').bootstrapTable('uncheckBy', {
+                field: 'docId',
+                values: cleanRowsIds
+            });
+        }
+    }
+
 
     // add food to new table
     function addFood() {
+        console.time('addFood'); //measuring
+        let dayFormat = getTodaysDayFormat(0); // just once per data.
+
         const addSelections = $('#macrosTable').bootstrapTable('getSelections');
         console.log("selections.length: " + addSelections.length);
 
         if (addSelections.length > 0) {
             for (var k = 0; k < addSelections.length; k++) { // if we use checkbox we will need use the for loop
 
-                const intakeId = guid();
+                console.time('guid');
+                const intakeId = 123; // hardcoded temp id.
+                console.timeEnd('guid');
                 console.log("intakeId: %s", intakeId);
 
                 const consumptionRow = {
@@ -185,27 +209,36 @@
                     intakeCarbs: addSelections[k].carb,
                     intakeFiber: addSelections[k].fiber,
                     macroId: addSelections[k].docId,
-                    intakeDate: getTodaysDayFormat(0),
+                    intakeDate: dayFormat,
                     userId: currentUser.uid //current user
                 };
 
-                // $('#consumptionTable').bootstrapTable('insertRow', {
-                //     index: i, row: (consumptionRow)
-                // });
-
                 console.log("_name_Before_saving: " + addSelections[k].name);
+                console.time('< FireBase 1');
 
                 // Persist intake on FireBase
                 intakeCollection.add(consumptionRow).then(function (savedIntakeDoc) {
                     console.log("Document written with ID: ", savedIntakeDoc.id);
-                    const newIntakeDocRef = intakeCollection.doc(savedIntakeDoc.id);
 
+                    console.timeEnd('< FireBase 1');
+                    console.time('< FireBase 2');
+
+                    const newIntakeDocRef = intakeCollection.doc(savedIntakeDoc.id);
                     newIntakeDocRef.update({
                         docId: savedIntakeDoc.id
                     }).then(function () {
-                        newIntakeDocRef.docId = savedIntakeDoc.id;
+                        consumptionRow.docId = savedIntakeDoc.id;
                         console.log("Intake Document successfully updated!");
+                        console.timeEnd('< FireBase 2');
+
+                        // add row with the new food
+                        $('#consumptionTable').bootstrapTable('insertRow', {
+                            index: 0, row: (consumptionRow)
+                        });
+
+                        cleanSelections();
                         totalMacrosTable();
+                        console.timeEnd('addFood'); // end measuring
                     }).catch(function (error) {
                         console.error("Error updating Intake document: ", error);
                     })
@@ -239,12 +272,12 @@
             .get()
             .then(function (qSnap) {
                 qSnap.forEach(function (doc) {
-                    console.log("<< YES ---");
                     console.log(doc.id, " => ", doc.data());
                     mIntakes.push(doc.data()); // adding each value to the table
-                    $('#consumptionTable').bootstrapTable("load", mIntakes); // printing data intake table
-                    totalMacrosTable();
                 });
+                console.log("<< Printing in consumptionTable ---");
+                $('#consumptionTable').bootstrapTable("load", mIntakes); // printing data intake table
+                totalMacrosTable();
             }).catch(function (error) {
             console.log("<< something wrong ----", error);
         });
@@ -252,6 +285,7 @@
 
     // Operations on totals
     function totalMacrosTable() {
+        console.time('macrosNumbers');
 //        alert(document.getElementById("totalDayValues").rows[0].cells.item(0).innerHTML);
 //        alert(document.getElementById("totalDayValues").rows[2].cells.item(2).innerHTML);
         var consumptionTable = document.getElementById("consumptionTable");
@@ -300,6 +334,7 @@
         fatsField.innerHTML = totalFats;
         carbsField.innerHTML = totalCarbs;
         fiberField.innerHTML = totalFiber;
+        console.timeEnd('macrosNumbers');
     }
 
     function removeConsumption() {
@@ -314,9 +349,12 @@
             for (var j = 0; j < intakeIds.length; j++) {
                 var selectedIntakeDocRef = intakeCollection.doc(intakeIds[j]);
 
+                console.time('< FireBaseDelete 3');
                 // removing intake document fireStore.
                 selectedIntakeDocRef.delete().then(function () {
                     console.log("Intake Document successfully deleted!");
+
+                    console.timeEnd('< FireBaseDelete 3');
 
                     // removing rows from the table
                     $('#consumptionTable').bootstrapTable('remove', {
@@ -355,44 +393,40 @@
 
         // addfood button after adding unchecking all the rows.
         $('#uncheckAll').click(function () {
-            console.log("1111 Uncheking the rows and reset the search");
+            console.log("resetSearch");
             $('#macrosTable').bootstrapTable('resetSearch');
-            $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+            //$('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+            // $('#macrosTable').bootstrapTable('uncheckAll')
         });
 
         $('#closeModal').click(function () {
-            console.log("2222  Uncheking  reset search the rows and reset the search");
-            $('#macrosTable').bootstrapTable('resetSearch');
-            // $('#macrosTable').bootstrapTable('togglePagination').bootstrapTable('uncheckAll').bootstrapTable('togglePagination');
+            console.log("2222  Unchecking  reset search the rows and reset the search");
+            cleanSelections();
         });
 
         // onDblClickCell
         $('#macrosTable').on('dbl-click-row.bs.table', function (e, row, $element) {
-            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
-            console.log("doble click row!!");
+            console.log("double click row!!");
             console.log("row.docId: " + row.docId);
             console.log("food: " + row.food);
         });
 
         // onCheck Intake
         $('#consumptionTable').on('check.bs.table', function (e, row, $element) {
-            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("< Click en Consumption!!");
             console.log("< objectID: " + row.docId);
-            console.log("< row.food: " + row.name);
+            console.log("< row.intakeFood: " + row.intakeFood);
         });
 
         // onUncheck Intake
         $('#consumptionTable').on('uncheck.bs.table', function (e, row, $element) {
-            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("UnCheck Consumption!!");
             console.log("row.docId: " + row.docId);
-            console.log("food: " + row.name);
+            console.log("food: " + row.intakeFood);
         });
 
         // onCheck
         $('#macrosTable').on('check.bs.table', function (e, row, $element) {
-            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
             console.log("< Click en Fila!!");
             console.log("< objectID: " + row.docId);
             console.log("< row.food: " + row.name);
@@ -402,17 +436,13 @@
             console.log(":::page-change.bs.table  >>>>");
             console.log("number:" + number); //page 2
             console.log("size:" + size); // size 10
-            // custom offset
-            //            var offset = (number - 1) * size;
-            //            loadMacros(offset, size);
         });
 
         // onUncheck
         $('#macrosTable').on('uncheck.bs.table', function (e, row, $element) {
-            //            $('#eventsResult').text('Event: dbl-click-row.bs.table');
-            console.log("UnCheck Fila!!");
-            console.log("row.docId: " + row.docId);
-            console.log("food: " + row.name);
+            // console.log("UnCheck Fila!!");
+            // console.log("row.docId: " + row.docId);
+            console.log("Uncheck food: " + row.name);
         });
 
         // // onRefresh Macros
@@ -663,7 +693,6 @@
     </thead>
 </table>
 
-
 <div class="modal fade" id="macrosModal" tabindex="-1" role="dialog" aria-labelledby="gridSystemModalLabel">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -744,15 +773,15 @@
 
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="button" id="uncheckAll" class="btn btn-success" onclick="addFood()" data-dismiss="modal">
+                <button type="button" class="btn btn-default" data-dismiss="modal" onclick="cleanSelections()">Close
+                </button>
+                <button type="button" class="btn btn-success" onclick="addFood()" data-dismiss="modal">
                     Add food
                 </button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
 </div><!-- /.modal -->
-
 
 </body>
 </html>

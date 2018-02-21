@@ -1,16 +1,16 @@
-
+// we are not using this listeners at the moment, will see once we integrate the mobile apps.
 macrosCollection
     .onSnapshot(function (querySnapshot) {
         console.log("== something change mTotalMacros ==");
         var mTotalMacros = [];
         querySnapshot.docChanges.forEach(function (change) {
-            if(change.type === "added"){
+            if (change.type === "added") {
                 return
             }
-            if(change.type === "modified"){
+            if (change.type === "modified") {
                 console.log("< modified: " + change.doc.data().name);
             }
-            if(change.type === "removed"){
+            if (change.type === "removed") {
                 console.log("< removed: " + change.doc.data().name);
             }
             // mTotalMacros.push(change.doc.data());
@@ -26,9 +26,9 @@ intakeCollection.where('userId', "==", currentUser.uid).where('intakeDate', '=='
         console.log("== something change mIntake ==");
         var mIntake = [];
         qSnapshot.forEach(function (doc) {
-            mIntake.push(doc.data());
+            // mIntake.push(doc.data());
             console.log("== updating mIntake ==");
-            $('#consumptionTable').bootstrapTable("load", mIntake);
+            // $('#consumptionTable').bootstrapTable("load", mIntake);
         });
     }, function (error) {
         console.log("onSnapshot Error intakeCollection");
